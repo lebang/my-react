@@ -13,22 +13,28 @@ function createElement(type, props, ...children) {
     type,
     props: {
       ...props,
-      children: children.map(child => typeof child === 'object' ? child : createTextNode(child))
+      children: children.map(child => {
+        if (typeof child === 'string') {
+          return createTextNode(child);
+        } else {
+          return createElement(child.type, child.props, ...child.children);
+        }
+      })
     }
   }
 }
 
 function renderV1(el, container) {
-  const dom = el.type === 'TEXT_ELEMENT' 
-              ? document.createTextNode(el.nodeValue) 
-              : document.createElement(el.type);
+  const dom = el.type === 'TEXT_ELEMENT'
+    ? document.createTextNode(el.nodeValue)
+    : document.createElement(el.type);
 
   // 处理props
-    Object.keys(el.props).forEach(key => {
-      if (key !== 'children') {
-        dom[key] = el.props[key];
-      }
-    });
+  Object.keys(el.props).forEach(key => {
+    if (key !== 'children') {
+      dom[key] = el.props[key];
+    }
+  });
 
   // 处理children
   const children = el.props.children;
@@ -48,6 +54,7 @@ function render(el, container) {
       children: [el]
     }
   }
+  console.log('next unit:', nextUnitOfWork);
 }
 
 function workLoop(deadline) {
@@ -78,9 +85,10 @@ function initChildren(fiber) {
 
   const { children } = fiber.props;
   children.forEach((child, index) => {
+    const { type, props } = child;
     const newFiber = {
-      type: child.type,
-      props: child.props,
+      type,
+      props,
       parent: fiber,
       dom: null,
       child: null,
