@@ -14,10 +14,10 @@ function createElement(type, props, ...children) {
     props: {
       ...props,
       children: children.map(child => {
-        if (typeof child === 'string') {
+        if (typeof child === 'string' || typeof child === 'number') {
           return createTextNode(child);
         } else {
-          return createElement(child.type, child.props, ...child.children);
+          return child;
         }
       })
     }
@@ -68,7 +68,14 @@ function commitWork(fiber) {
   if (!fiber) {
     return;
   }
-  fiber.parent.dom.append(fiber.dom);
+
+  let fiberParent = fiber.parent;
+  while (!fiberParent.dom) {
+    fiberParent = fiberParent.parent;
+  }
+  if (fiber.dom) {
+    fiberParent.dom.append(fiber.dom);
+  }
   commitWork(fiber.child);
   commitWork(fiber.sibling);
 }
@@ -100,10 +107,9 @@ function updateProps(dom, props) {
   })
 }
 
-function initChildren(fiber) {
+function initChildren(fiber, children) {
   let pervChild = null;
 
-  const { children } = fiber.props;
   children.forEach((child, index) => {
     const { type, props } = child;
     const newFiber = {
@@ -123,17 +129,48 @@ function initChildren(fiber) {
   })
 }
 
-function performUnitOfWork(fiber) {
-  // 创建DOM
+function updateFunctionComponent(fiber) {
+  const children = [fiber.type(fiber.props)];
+  initChildren(fiber, children);
+}
+
+function updateHostComponent(fiber) {
   if (!fiber.dom) {
     fiber.dom = createDom(fiber.type);
-    // fiber.parent.dom.append(fiber.dom);
     updateProps(fiber.dom, fiber.props);
   }
+  const children = fiber.props.children;
+  initChildren(fiber, children);
+}
 
-  initChildren(fiber);
+function performUnitOfWork(fiber) {
+  const isFunctionComponent = typeof fiber.type === 'function';
 
-  return fiber?.child || fiber?.sibling || fiber.parent?.sibling;
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostComponent(fiber);
+  }
+
+  // if (!isFunctionComponent) {
+  //   if (!fiber.dom) {
+  //     fiber.dom = createDom(fiber.type);
+  //     updateProps(fiber.dom, fiber.props);
+  //   }
+  // }
+
+  // const children = isFunctionComponent ? [fiber.type(fiber.props)] : fiber.props.children;
+  // initChildren(fiber, children);
+
+  if( fiber.child) return fiber.child;
+
+  let nextFiber = fiber;
+  while (nextFiber) {
+    if(nextFiber.sibling) {
+      return nextFiber.sibling
+    }
+    nextFiber = nextFiber.parent;
+  }
 }
 
 const React = {
