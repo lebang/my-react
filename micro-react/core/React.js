@@ -45,6 +45,7 @@ function renderV1(el, container) {
   container.append(dom);
 }
 
+let root = null;
 let nextUnitOfWork = null;
 
 function render(el, container) {
@@ -54,7 +55,22 @@ function render(el, container) {
       children: [el]
     }
   }
+  root = nextUnitOfWork;
   console.log('next unit:', nextUnitOfWork);
+}
+
+function commitRoot() {
+  commitWork(root.child);
+  root = null;
+}
+
+function commitWork(fiber) {
+  if (!fiber) {
+    return;
+  }
+  fiber.parent.dom.append(fiber.dom);
+  commitWork(fiber.child);
+  commitWork(fiber.sibling);
 }
 
 function workLoop(deadline) {
@@ -62,6 +78,10 @@ function workLoop(deadline) {
   while (nextUnitOfWork && !shouldYield) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
     shouldYield = deadline.timeRemaining() < 1;
+  }
+
+  if (!nextUnitOfWork && root) {
+    commitRoot();
   }
   requestIdleCallback(workLoop);
 }
@@ -107,7 +127,7 @@ function performUnitOfWork(fiber) {
   // 创建DOM
   if (!fiber.dom) {
     fiber.dom = createDom(fiber.type);
-    fiber.parent.dom.append(fiber.dom);
+    // fiber.parent.dom.append(fiber.dom);
     updateProps(fiber.dom, fiber.props);
   }
 
