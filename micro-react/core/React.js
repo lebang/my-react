@@ -102,7 +102,12 @@ function createDom(type) {
 function updateProps(dom, props) {
   Object.keys(props).forEach(key => {
     if (key !== 'children') {
-      dom[key] = props[key];
+      if (key.startsWith('on')){
+        const eventName = key.toLowerCase().substring(2);
+        dom.addEventListener(eventName, props[key]);
+      } else {
+        dom[key] = props[key];
+      }
     }
   })
 }
@@ -151,16 +156,6 @@ function performUnitOfWork(fiber) {
   } else {
     updateHostComponent(fiber);
   }
-
-  // if (!isFunctionComponent) {
-  //   if (!fiber.dom) {
-  //     fiber.dom = createDom(fiber.type);
-  //     updateProps(fiber.dom, fiber.props);
-  //   }
-  // }
-
-  // const children = isFunctionComponent ? [fiber.type(fiber.props)] : fiber.props.children;
-  // initChildren(fiber, children);
 
   if( fiber.child) return fiber.child;
 
