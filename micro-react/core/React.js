@@ -118,30 +118,19 @@ function updateProps(dom, nextProps, prevProps={}) {
   });
 
   Object.keys(nextProps).forEach(key => {
-    if (key !== 'children') {
-      if (key.startsWith('on')){
-        const eventName = key.toLowerCase().substring(2);
-        dom.removeEventListener(eventName, prevProps[key]);
-        dom.addEventListener(eventName, nextProps[key]);
-      } else {
-        dom[key] = nextProps[key];
-      }
-    }
-  })
+    if (key === 'children') return;
 
-  // Object.keys(nextProps).forEach(key => {
-  //   if (key !== 'children') {
-  //     if (key.startsWith('on')){
-  //       const eventName = key.toLowerCase().substring(2);
-  //       dom.addEventListener(eventName, nextProps[key]);
-  //     } else {
-  //       dom[key] = nextProps[key];
-  //     }
-  //   }
-  // })
+    if (!key.startsWith('on')){
+      dom[key] = nextProps[key];
+      return;
+    } 
+    const eventName = key.toLowerCase().substring(2);
+    dom.removeEventListener(eventName, prevProps[key]);
+    dom.addEventListener(eventName, nextProps[key]);
+  })
 }
 
-function initChildren(fiber, children) {
+function reconcileChildren(fiber, children) {
   let olderFiber = fiber.alternate?.child;
   let pervChild = null;
 
@@ -154,9 +143,9 @@ function initChildren(fiber, children) {
         type,
         props,
         parent: fiber,
-        dom: olderFiber.dom,
         child: null,
         sibling: null,
+        dom: olderFiber.dom,
         alternate: olderFiber,
         effectTag: 'update'
       }
@@ -165,9 +154,9 @@ function initChildren(fiber, children) {
         type,
         props,
         parent: fiber,
-        dom: null,
         child: null,
         sibling: null,
+        dom: null,
         effectTag: 'placement'
       }
     }
@@ -185,7 +174,7 @@ function initChildren(fiber, children) {
 
 function updateFunctionComponent(fiber) {
   const children = [fiber.type(fiber.props)];
-  initChildren(fiber, children);
+  reconcileChildren(fiber, children);
 }
 
 function updateHostComponent(fiber) {
@@ -194,7 +183,7 @@ function updateHostComponent(fiber) {
     updateProps(fiber.dom, fiber.props);
   }
   const children = fiber.props.children;
-  initChildren(fiber, children);
+  reconcileChildren(fiber, children);
 }
 
 function performUnitOfWork(fiber) {
