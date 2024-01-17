@@ -1,3 +1,5 @@
+
+
 function createTextNode(text) {
   return {
     type: 'TEXT_ELEMENT',
@@ -46,21 +48,22 @@ function renderV1(el, container) {
 }
 
 let root = null;
+let currentRoot = null;
 let nextUnitOfWork = null;
 
 function render(el, container) {
-  nextUnitOfWork = {
+  root = {
     dom: container,
     props: {
       children: [el]
     }
   }
-  root = nextUnitOfWork;
-  console.log('next unit:', nextUnitOfWork);
+  nextUnitOfWork = root;
 }
 
 function commitRoot() {
   commitWork(root.child);
+  currentRoot = root;
   root = null;
 }
 
@@ -73,9 +76,16 @@ function commitWork(fiber) {
   while (!fiberParent.dom) {
     fiberParent = fiberParent.parent;
   }
-  if (fiber.dom) {
-    fiberParent.dom.append(fiber.dom);
+
+  if (fiber.effectTag === 'placement') {
+    fiber?.dom && fiberParent.dom.append(fiber.dom);
+  } else if (fiber.effectTag === 'update') {
+    fiber?.dom && updateProps(fiber.dom, fiber.props, fiber.alternate.props);
   }
+
+  // if (fiber.dom) {
+  //   fiberParent.dom.append(fiber.dom);
+  // }
   commitWork(fiber.child);
   commitWork(fiber.sibling);
 }
@@ -99,31 +109,70 @@ function createDom(type) {
   return type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(type);
 }
 
-function updateProps(dom, props) {
-  Object.keys(props).forEach(key => {
+function updateProps(dom, nextProps, prevProps={}) {
+
+  Object.keys(prevProps).forEach(key => {
+    if (!(key in nextProps)) {
+      dom.removeAttribute(key);
+    }
+  });
+
+  Object.keys(nextProps).forEach(key => {
     if (key !== 'children') {
       if (key.startsWith('on')){
         const eventName = key.toLowerCase().substring(2);
-        dom.addEventListener(eventName, props[key]);
+        dom.removeEventListener(eventName, prevProps[key]);
+        dom.addEventListener(eventName, nextProps[key]);
       } else {
-        dom[key] = props[key];
+        dom[key] = nextProps[key];
       }
     }
   })
+
+  // Object.keys(nextProps).forEach(key => {
+  //   if (key !== 'children') {
+  //     if (key.startsWith('on')){
+  //       const eventName = key.toLowerCase().substring(2);
+  //       dom.addEventListener(eventName, nextProps[key]);
+  //     } else {
+  //       dom[key] = nextProps[key];
+  //     }
+  //   }
+  // })
 }
 
 function initChildren(fiber, children) {
+  let olderFiber = fiber.alternate?.child;
   let pervChild = null;
 
   children.forEach((child, index) => {
+    const isSameType = child.type === olderFiber?.type;
+    let newFiber = null;
     const { type, props } = child;
-    const newFiber = {
-      type,
-      props,
-      parent: fiber,
-      dom: null,
-      child: null,
-      sibling: null
+    if (isSameType) {
+      newFiber = {
+        type,
+        props,
+        parent: fiber,
+        dom: olderFiber.dom,
+        child: null,
+        sibling: null,
+        alternate: olderFiber,
+        effectTag: 'update'
+      }
+    } else {
+       newFiber = {
+        type,
+        props,
+        parent: fiber,
+        dom: null,
+        child: null,
+        sibling: null,
+        effectTag: 'placement'
+      }
+    }
+    if (olderFiber) {
+      olderFiber = olderFiber.sibling;
     }
     if (index === 0) {
       fiber.child = newFiber;
@@ -166,9 +215,20 @@ function performUnitOfWork(fiber) {
     }
     nextFiber = nextFiber.parent;
   }
+  return undefined;
+}
+
+const update = () => {
+  root = {
+    dom: currentRoot.dom,
+    props: currentRoot.props,
+    alternate: currentRoot,
+  }
+  nextUnitOfWork = root;
 }
 
 const React = {
+  update,
   render,
   createElement
 }
