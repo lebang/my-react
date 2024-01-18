@@ -51,6 +51,7 @@ let root = null;
 let currentRoot = null;
 let nextUnitOfWork = null;
 let deletion = [];
+let wipFiber = null;
 
 function render(el, container) {
   root = {
@@ -106,6 +107,11 @@ function workLoop(deadline) {
   let shouldYield = false;
   while (nextUnitOfWork && !shouldYield) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
+
+    if (root?.sibling?.type === nextUnitOfWork?.type) {
+      nextUnitOfWork = null;
+    }
+
     shouldYield = deadline.timeRemaining() < 1;
   }
 
@@ -197,6 +203,7 @@ function reconcileChildren(fiber, children) {
 }
 
 function updateFunctionComponent(fiber) {
+  wipFiber = fiber;
   const children = [fiber.type(fiber.props)];
   reconcileChildren(fiber, children);
 }
@@ -232,12 +239,20 @@ function performUnitOfWork(fiber) {
 }
 
 const update = () => {
-  root = {
-    dom: currentRoot.dom,
-    props: currentRoot.props,
-    alternate: currentRoot,
+  let currentFiber = wipFiber;
+  return () => {
+    root = {
+      ...currentFiber
+      alternate: currentFiber,
+    }
+
+    // root = {
+    //     dom: currentRoot.dom,
+    //     props: currentRoot.props,
+    //     alternate: currentRoot, // 根节点指向旧 dom 树的根节点
+    // }
+    nextUnitOfWork = root;
   }
-  nextUnitOfWork = root;
 }
 
 const React = {
