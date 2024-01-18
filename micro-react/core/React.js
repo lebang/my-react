@@ -50,6 +50,7 @@ function renderV1(el, container) {
 let root = null;
 let currentRoot = null;
 let nextUnitOfWork = null;
+let deletion = [];
 
 function render(el, container) {
   root = {
@@ -62,9 +63,23 @@ function render(el, container) {
 }
 
 function commitRoot() {
+  deletion.forEach(commitDeletion);
   commitWork(root.child);
   currentRoot = root;
   root = null;
+  deletion = [];
+}
+
+function commitDeletion(fiber) {
+  if (fiber.dom) {
+    let fiberParent = fiber.parent;
+    while (!fiberParent.dom) {
+      fiberParent = fiberParent.parent;
+    }
+    fiberParent.dom.removeChild(fiber.dom);
+  } else {
+    commitDeletion(fiber.child);
+  }
 }
 
 function commitWork(fiber) {
@@ -83,9 +98,6 @@ function commitWork(fiber) {
     fiber?.dom && updateProps(fiber.dom, fiber.props, fiber.alternate.props);
   }
 
-  // if (fiber.dom) {
-  //   fiberParent.dom.append(fiber.dom);
-  // }
   commitWork(fiber.child);
   commitWork(fiber.sibling);
 }
@@ -150,14 +162,19 @@ function reconcileChildren(fiber, children) {
         effectTag: 'update'
       }
     } else {
-       newFiber = {
-        type,
-        props,
-        parent: fiber,
-        child: null,
-        sibling: null,
-        dom: null,
-        effectTag: 'placement'
+      if (child) {
+        newFiber = {
+         type,
+         props,
+         parent: fiber,
+         child: null,
+         sibling: null,
+         dom: null,
+         effectTag: 'placement'
+       }
+      }
+      if (olderFiber) {
+        deletion.push(olderFiber);
       }
     }
     if (olderFiber) {
@@ -168,8 +185,15 @@ function reconcileChildren(fiber, children) {
     } else {
       pervChild.sibling = newFiber;
     }
-    pervChild = newFiber;
-  })
+    if (newFiber) {
+      pervChild = newFiber;
+    }
+  });
+
+  while (olderFiber) {
+    deletion.push(olderFiber);
+    olderFiber = olderFiber.sibling;
+  }
 }
 
 function updateFunctionComponent(fiber) {
